@@ -13,7 +13,6 @@ class NotificacionesController extends BaseController
 
     public function crear()
     {
-        // Si hay mensaje en sesión, lo pasamos a la vista
         $session = session();
         $msg = $session->getFlashdata('msg');
         return view('notificaciones/crear', ['msg' => $msg]);
@@ -36,9 +35,13 @@ class NotificacionesController extends BaseController
             'estado' => $estado
         ]);
 
-        // 🧠 Armar mensaje JSON
+        // 🆔 Obtener el ID insertado
+        $id = $db->insertID();
+
+        // 🧠 Armar mensaje JSON con ID incluido
         $data = [
             'type'      => 'notificacion',
+            'id'        => $id,
             'cliente'   => $cliente,
             'problema'  => $problema,
             'fechahora' => $fechahora,
@@ -54,9 +57,51 @@ class NotificacionesController extends BaseController
             log_message('error', "❌ No se pudo enviar al WebSocket: $errstr ($errno)");
         }
 
-        // ✅ En lugar de redirigir, recargamos la misma vista con mensaje
         return redirect()
             ->back()
             ->with('msg', '✅ Notificación creada y enviada correctamente.');
+    }
+
+    public function editar($id)
+    {
+        $db = \Config\Database::connect();
+        $builder = $db->table('notificaciones');
+        $notificacion = $builder->where('id', $id)->get()->getRow();
+
+        if (!$notificacion) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException('Notificación no encontrada');
+        }
+
+        return view('notificaciones/editar', ['notificacion' => $notificacion]);
+    }
+
+    public function actualizar($id)
+    {
+        $cliente   = $this->request->getPost('cliente');
+        $problema  = $this->request->getPost('problema');
+        $fechahora = $this->request->getPost('fechahora');
+        $estado    = $this->request->getPost('estado');
+
+        $db = \Config\Database::connect();
+        $builder = $db->table('notificaciones');
+
+        $builder->where('id', $id)->update([
+            'cliente' => $cliente,
+            'problema' => $problema,
+            'fechahora' => $fechahora,
+            'estado' => $estado
+        ]);
+
+        return redirect()->to('/notificaciones')->with('msg', '✅ Notificación actualizada correctamente.');
+    }
+
+    // 🔍 Endpoint para el API (listar todas)
+    public function listarTodas()
+    {
+        $db = \Config\Database::connect();
+        $builder = $db->table('notificaciones');
+        $notificaciones = $builder->orderBy('id', 'DESC')->get()->getResultArray();
+
+        return $this->response->setJSON($notificaciones);
     }
 }

@@ -9,75 +9,71 @@
 
   <style>
     body {
-      background: #f8fafc;
+      background: #f5f7fa;
     }
-    #noti-container {
-      height: 600px;
-      border: 1px solid #ccc;
-      padding: 1rem;
-      overflow-y: auto;
-      border-radius: 8px;
+    .noti-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .noti-card {
       background: #fff;
-    }
-    .noti-message {
-      margin: 1rem 0;
-      padding: 1rem;
+      border: 1px solid #ddd;
       border-radius: 12px;
-      background: #e9f7ef;
-      box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+      padding: 1rem;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .noti-card:hover {
+      transform: translateY(-3px);
     }
     .noti-header {
-      font-weight: bold;
-      color: #2c7a7b;
+      font-weight: 600;
+      color: #1e3a8a;
+      font-size: 1.1rem;
+    }
+    .noti-body {
+      margin: 0.5rem 0;
     }
     .noti-footer {
-      font-size: 0.8rem;
-      color: gray;
       display: flex;
       justify-content: space-between;
+      font-size: 0.8rem;
+      color: gray;
     }
     .status-badge {
-      padding: 0.1rem 0.6rem;
-      border-radius: 12px;
+      padding: 0.2rem 0.6rem;
+      border-radius: 8px;
+      color: #fff;
       font-weight: 600;
-      color: white;
+      font-size: 0.8rem;
     }
-    .status-pending {
-      background-color: #f6ad55;
-    }
-    .status-resolved {
-      background-color: #38a169;
-    }
-    /* Estado del servidor */
-    #statusText {
-      font-weight: bold;
-    }
-    #statusText.conectado {
-      color: green;
-    }
-    #statusText.desconectado {
-      color: red;
-    }
-    #statusText.error {
-      color: orange;
+    .status-pending { background-color: #f59e0b; }
+    .status-resolved { background-color: #16a34a; }
+    .status-other { background-color: #3b82f6; }
+
+    #statusText.conectado { color: green; font-weight: bold; }
+    #statusText.desconectado { color: red; font-weight: bold; }
+    #statusText.error { color: orange; font-weight: bold; }
+
+    .edit-btn {
+      font-size: 0.8rem;
     }
   </style>
 </head>
 <body>
   <div class="container my-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
       <h3>🔔 Notificaciones en tiempo real</h3>
       <div>
         Estado: <span id="statusText" class="desconectado">Desconectado</span>
       </div>
     </div>
 
-    <a href="/notificaciones/crear" class="btn btn-primary mb-3"> Nueva notificación</a>
+    <a href="<?= base_url('/notificaciones/crear') ?>" class="btn btn-primary mb-3">➕ Nueva notificación</a>
 
-    <div id="noti-container">
-      <div class="noti-message noti-system" style="background:#f0f0f0; color:#666; text-align:center;">
-        Conectando al servidor...
-      </div>
+    <div id="noti-container" class="noti-grid">
+      <div class="text-center text-muted">Conectando al servidor...</div>
     </div>
   </div>
 
@@ -85,7 +81,7 @@
     const notiContainer = document.getElementById('noti-container');
     const statusText = document.getElementById('statusText');
 
-    // 🔹 Formatear fecha legible
+    // 📅 Formato bonito de fecha
     function formatoBonito(fechaISO) {
       try {
         const f = new Date(fechaISO);
@@ -98,69 +94,83 @@
       }
     }
 
-    function addSystemMessage(msg) {
-      const div = document.createElement('div');
-      div.classList.add('noti-message');
-      div.style.background = '#f0f0f0';
-      div.style.color = '#666';
-      div.style.textAlign = 'center';
-      div.textContent = msg;
-      notiContainer.appendChild(div);
-      notiContainer.scrollTop = notiContainer.scrollHeight;
-    }
-
+    // 🧱 Crear tarjeta visual (evita duplicados)
     function addNotification(data) {
-      const div = document.createElement('div');
-      div.classList.add('noti-message');
+      if (document.getElementById(`noti-${data.id}`)) return;
 
-      let statusClass = 'status-pending';
+      const div = document.createElement('div');
+      div.classList.add('noti-card');
+      div.id = `noti-${data.id}`;
+
+      let statusClass = 'status-other';
+      if (data.estado?.toLowerCase() === 'pendiente') statusClass = 'status-pending';
       if (data.estado?.toLowerCase() === 'resuelto') statusClass = 'status-resolved';
 
       div.innerHTML = `
         <div class="noti-header">${data.cliente}</div>
-        <div>${data.problema}</div>
+        <div class="noti-body">${data.problema}</div>
         <div class="noti-footer">
           <span>${formatoBonito(data.fechahora)}</span>
           <span class="status-badge ${statusClass}">${data.estado}</span>
         </div>
+        <button class="btn btn-sm btn-outline-primary mt-2 edit-btn" onclick="editarNotificacion('${data.id}')">✏️ Editar</button>
       `;
-      notiContainer.appendChild(div);
-      notiContainer.scrollTop = notiContainer.scrollHeight;
+
+      // Agregar al inicio (más reciente primero)
+      notiContainer.prepend(div);
     }
 
-    // ===============================
-    // WebSocket Connection
-    // ===============================
+    function addSystemMessage(msg) {
+      const div = document.createElement('div');
+      div.classList.add('text-center', 'text-muted');
+      div.textContent = msg;
+      notiContainer.appendChild(div);
+    }
+
+    function editarNotificacion(id) {
+      window.location.href = `/notificaciones/editar/${id}`;
+    }
+
+    // 🔄 Cargar notificaciones existentes sin borrar las anteriores
+    async function cargarNotificacionesIniciales() {
+      try {
+        const res = await fetch('/api/notificaciones');
+        const datos = await res.json();
+
+        if (datos.length === 0) {
+          addSystemMessage('No hay notificaciones registradas.');
+        } else {
+          datos.forEach(n => addNotification(n));
+        }
+      } catch (err) {
+        console.error('Error cargando notificaciones:', err);
+        addSystemMessage('⚠️ No se pudieron cargar las notificaciones.');
+      }
+    }
+
+    // 🔌 WebSocket
     const socket = new WebSocket('ws://localhost:8080');
 
     socket.onopen = () => {
-      console.log(' Conectado al WebSocket');
       statusText.textContent = 'Conectado';
       statusText.className = 'conectado';
-      addSystemMessage(' Conectado al servidor WebSocket.');
+      addSystemMessage('✅ Conectado al servidor.');
+      cargarNotificacionesIniciales(); // carga solo una vez
     };
 
     socket.onmessage = e => {
       const data = JSON.parse(e.data);
-      if (data.type === 'notificacion') {
-        addNotification(data);
-      } else {
-        addSystemMessage(data.message || '📩 Mensaje recibido.');
-      }
+      if (data.type === 'notificacion') addNotification(data);
     };
 
     socket.onerror = e => {
-      console.error(' Error WebSocket', e);
-      statusText.textContent = 'Error de conexión';
+      statusText.textContent = 'Error';
       statusText.className = 'error';
-      addSystemMessage(' Error en la conexión WebSocket.');
     };
 
     socket.onclose = () => {
-      console.log(' Conexión cerrada');
       statusText.textContent = 'Desconectado';
       statusText.className = 'desconectado';
-      addSystemMessage('🔌 Desconectado del servidor.');
     };
   </script>
 </body>
